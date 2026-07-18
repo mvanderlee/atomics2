@@ -1,6 +1,11 @@
 from setuptools import setup, find_packages, Command, Extension
 from setuptools.command import build_py
-from wheel.bdist_wheel import bdist_wheel
+
+try:
+    # setuptools >= 70.1 (wheel >= 0.46 no longer provides wheel.bdist_wheel)
+    from setuptools.command.bdist_wheel import bdist_wheel
+except ImportError:
+    from wheel.bdist_wheel import bdist_wheel
 
 import configparser
 import git
