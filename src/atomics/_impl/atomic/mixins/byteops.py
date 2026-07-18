@@ -142,7 +142,7 @@ class ByteOperationsMixin(_ImplByteOperationsMixin):
         return self._impl_cmpxchg(OpType.CMPXCHG_STRONG, expected, desired, succ, fail)
 
     def bit_test(self, index: int, order: MemoryOrder = MemoryOrder.SEQ_CST) -> bool:
-        if not order.is_valid_store_order():
+        if not order.is_valid_load_order():
             raise MemoryOrderError(OpType.BIT_TEST, order, is_fail=False)
         return self._impl_bit_test(OpType.BIT_TEST, index, order)
 

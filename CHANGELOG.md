@@ -18,6 +18,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Failed `cmpxchg_weak`/`cmpxchg_strong` no longer writes the actual value into
   the caller's immutable `expected` bytes object (which for width-1 atomics
   corrupted CPython's interned single-byte objects process-wide)
+- `bit_test` now validates its memory order as a load operation; it previously
+  rejected valid `ACQUIRE` and passed invalid `RELEASE` through to `patomic`
 
 ## [1.0.3] [Patch] - 2025-01-03
 ### Fixed:

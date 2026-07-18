@@ -190,20 +190,22 @@ def test_properties() -> None:
     assert len(a.ops_supported) > 10
 
 
-@pytest.mark.parametrize("order,op", [
-    pytest.param(MemoryOrder.RELEASE, "load", id="release-load"),
-    pytest.param(MemoryOrder.ACQUIRE, "store", id="acquire-store"),
+@pytest.mark.parametrize("order,op,args", [
+    pytest.param(MemoryOrder.RELEASE, "load", (), id="release-load"),
+    pytest.param(MemoryOrder.ACQUIRE, "store", (1,), id="acquire-store"),
+    pytest.param(MemoryOrder.RELEASE, "bit_test", (0,), id="release-bit_test"),
 ])
-def test_invalid_memory_order_raises(order, op) -> None:
+def test_invalid_memory_order_raises(order, op, args) -> None:
     a = atomics.atomic(width=4, atype=atomics.INT)
     with pytest.raises(MemoryOrderError):
-        getattr(a, op)(*([1] if op == "store" else []), order=order)
+        getattr(a, op)(*args, order=order)
 
 
 def test_valid_memory_orders() -> None:
     a = atomics.atomic(width=4, atype=atomics.INT)
     a.store(1, order=MemoryOrder.RELEASE)
     assert a.load(order=MemoryOrder.ACQUIRE) == 1
+    assert a.bit_test(0, order=MemoryOrder.ACQUIRE) is True
 
 # endregion - Alignment, properties, memory orders
 
