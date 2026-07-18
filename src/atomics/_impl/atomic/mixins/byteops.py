@@ -69,9 +69,8 @@ class _ImplByteOperationsMixin:
         # result "param"
         result = None
         if "FETCH" in optype.name:
-            result = bytes(self._core.width)
-            res_buf = PyBuffer(result, writeable=True, force=True)
-            # modifying result contents directly is fine in this case
+            result = bytearray(self._core.width)
+            res_buf = PyBuffer(result, writeable=True)
             args.append(res_buf.address)
             bufs.append(res_buf)
         # perform operation
@@ -79,7 +78,7 @@ class _ImplByteOperationsMixin:
         # release buffers and return
         for buf in bufs:
             buf.release()
-        return result
+        return bytes(result) if result is not None else None
 
 
 class ByteOperationsMixin(_ImplByteOperationsMixin):
@@ -109,11 +108,10 @@ class ByteOperationsMixin(_ImplByteOperationsMixin):
         elif not order.is_valid_load_order():
             raise MemoryOrderError(OpType.LOAD, order, is_fail=False)
         # perform operation
-        result = bytes(self._core.width)
-        with PyBuffer(result, writeable=True, force=True) as res_buf:
-            # modifying result contents directly is fine in this case
+        result = bytearray(self._core.width)
+        with PyBuffer(result, writeable=True) as res_buf:
             fp(self._core.address, order.value, res_buf.address)
-        return result
+        return bytes(result)
 
     def exchange(self, desired: bytes, order: MemoryOrder = MemoryOrder.SEQ_CST) -> bytes:
         # check support
@@ -124,12 +122,11 @@ class ByteOperationsMixin(_ImplByteOperationsMixin):
         elif len(desired) != self._core.width:
             raise ValueError("'desired' object length does not match width.")
         # perform operation
-        result = bytes(self._core.width)
-        with PyBuffer(result, writeable=True, force=True) as res_buf:
-            # modifying result contents directly is fine in this case
+        result = bytearray(self._core.width)
+        with PyBuffer(result, writeable=True) as res_buf:
             with PyBuffer(desired, writeable=False) as des_buf:
                 fp(self._core.address, des_buf.address, order.value, res_buf.address)
-        return result
+        return bytes(result)
 
     def cmpxchg_weak(self, expected: bytes, desired: bytes,
                      succ: MemoryOrder = MemoryOrder.SEQ_CST,

@@ -6,13 +6,13 @@ ffi = cffi.FFI()
 
 class PyBuffer:
 
-    def __init__(self, exporter, *, writeable: bool, force: bool = False):
+    def __init__(self, exporter, *, writeable: bool):
         # check if __init__ has been called
         if hasattr(self, "_buf"):
             raise ValueError("PyBuffer object cannot be re-initialised.")
         # check if writeable can be satisfied
         with memoryview(exporter) as view:
-            if writeable and view.readonly and not force:
+            if writeable and view.readonly:
                 raise RuntimeError("Cannot create writeable PyBuffer from readonly exporter.")
             # get and save buffer
             self._buf = ffi.from_buffer("char[]", exporter, not view.readonly)
