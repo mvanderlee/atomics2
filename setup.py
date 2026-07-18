@@ -78,9 +78,7 @@ class BuildPatomicCommand(Command):
 
     def initialize_options(self) -> None:
         self.git_url = "https://github.com/doodspav/patomic"
-        # pin to patomic v0.2.2 until we migrate to stable release
-        # self.git_tag = None
-        self.git_tag = "v0.2.2"
+        self.git_tag = "v1.1.0"
         self.dest_dir = here / "src" / "atomics" / "_clib"
         self.build_type = "RelWithDebInfo"
         self.force_replace = False
