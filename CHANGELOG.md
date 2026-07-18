@@ -12,6 +12,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   overflow behaviour (wraparound) are unchanged
 - Loading a stale `patomic` shared library with a different major version now
   raises `RuntimeError` instead of silently misreading the ABI
+- Supported Python versions are now 3.11 - 3.14 (wheels were previously tagged
+  up to 3.11 only, forcing source builds on newer interpreters)
 ### Fixed
 - Failed `cmpxchg_weak`/`cmpxchg_strong` no longer writes the actual value into
   the caller's immutable `expected` bytes object (which for width-1 atomics
