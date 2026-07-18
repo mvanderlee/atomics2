@@ -44,15 +44,15 @@ Windows:
 ```shell
 $ py -m pip install atomics
 ```
-This library requires Python3.6+, and has a dependency on the `cffi` library.
+This library requires Python3.11+, and has a dependency on the `cffi` library.
 While the code here has no dependency on any implementation specific features,
 the `cffi` library functions used are likely to not work outside of CPython and 
 PyPy.
 
 Binaries are provided for the following platforms:
-- Windows `[x86, amd64]`
-- MacOSX `[x86_64, universal2]`
-- Linux `[i686, x86_64, aarch64, ppc64le, s390x]` `[manylinux2014, musllinux_1_1]`
+- Windows `[x86, amd64, arm64]`
+- MacOSX `[x86_64, arm64, universal2]`
+- Linux `[i686, x86_64, aarch64, ppc64le, s390x]` `[manylinux2014, musllinux_1_2]`
 - Linux `[i686, x86_64]` `[manylinux1]`
 
 If you are on one of these platforms and `pip` tries to build from source or
@@ -435,9 +435,10 @@ This clones the `patomic` library into a temporary directory, builds it, and
 then copies the shared library into `atomics._clib`.
 
 This requires that `git` be installed on your system (a requirement of the
-`GitPython` module). You will also need an ANSI/C90 compliant C compiler
-(although ideally a more recent compiler should be used). `CMake` is also 
-required but should be automatically `pip install`'d if not available.
+`GitPython` module). You will also need a C compiler with C11 `<stdatomic.h>`
+support (or MSVC on Windows), otherwise `patomic` will build but support no
+operations. `CMake` is also required but should be automatically
+`pip install`'d if not available.
 
 If you absolutely cannot get `build_patomic` to work, go to
 [patomic](https://github.com/doodspav/patomic), follow the instructions on
@@ -453,7 +454,6 @@ development libraries/headers for whichever version of Python you're using.
 
 ## Future Thoughts
 - add docstrings
-- add tests
 - add support for `minimum` alignment
 - add support for constructing `Atomic` classes' buffers in shared memory
 - add support for passing `Atomic` objects to sub-processes and sub-interpreters
