@@ -162,10 +162,10 @@ class BuildPatomicCommand(Command):
         self.logger.debug(str(opts))
 
     @staticmethod
-    def _cibw_check_win32_x86() -> bool:
-        """Checks if CIBW is building for win32-x86"""
-        env = os.environ.get("CIBW_MC_NAME")
-        return type(env) is str and env.lower() == "win32-x86"
+    def _cibw_msvc_platform() -> Optional[str]:
+        """Returns the CMake -A platform when CIBW cross-builds with MSVC"""
+        env = os.environ.get("CIBW_MC_NAME", "")
+        return {"win32-x86": "Win32", "win32-arm64": "ARM64"}.get(env.lower())
 
     def get_patomic_libs(self, dir_path: pathlib.Path) -> [pathlib.Path]:
         """Returns a list of patomic shared library files found in dir_path"""
@@ -214,9 +214,10 @@ class BuildPatomicCommand(Command):
         if self.linker_args:
             self.logger.info(f"Linker args: {self.linker_args}")
             cmd_config.append(f"-DCMAKE_SHARED_LINKER_FLAGS={self.linker_args}")
-        if self._cibw_check_win32_x86():
-            self.logger.info("Running under win32-x86 on CIBW - using '-A Win32'")
-            cmd_config.append("-AWin32")
+        msvc_platform = self._cibw_msvc_platform()
+        if msvc_platform:
+            self.logger.info(f"Cross-building on CIBW - using '-A {msvc_platform}'")
+            cmd_config.append(f"-A{msvc_platform}")
         if self.cmake_args:
             self.logger.info(f"Appending CMake args: {self.cmake_args}")
             cmd_config.append(self.cmake_args)
