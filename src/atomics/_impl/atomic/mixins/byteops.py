@@ -28,13 +28,11 @@ class _ImplByteOperationsMixin:
         elif not fail.is_valid_fail_order(succ):
             raise MemoryOrderError(optype, fail, is_fail=True)
         # perform operation
-        exp_mut = bytes(expected)  # make a copy so we can modify it
-        des_mut = bytes(desired)  # make a copy so we can modify it
-        with PyBuffer(exp_mut, writeable=True, force=True) as exp_buf:
-            with PyBuffer(des_mut, writeable=True, force=True) as des_buf:
-                # modifying exp and des contents directly is fine in this case
+        exp_mut = bytearray(expected)  # patomic writes the actual value here on failure
+        with PyBuffer(exp_mut, writeable=True) as exp_buf:
+            with PyBuffer(desired, writeable=False) as des_buf:
                 ok = fp(self._core.address, exp_buf.address, des_buf.address, succ.value, fail.value)
-        return CmpxchgResult(bool(ok), exp_mut)
+        return CmpxchgResult(bool(ok), bytes(exp_mut))
 
     def _impl_bit_test(self, optype: OpType, index: int, order: MemoryOrder) -> bool:
         assert ("BIT_TEST" in optype.name)
