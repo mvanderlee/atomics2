@@ -39,6 +39,9 @@ jobs:
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      # required for PyPI trusted publishing (OIDC)
+      id-token: write
     steps:
       - uses: actions/upload-artifact/merge@v7
         with:
@@ -51,6 +54,3 @@ jobs:
           path: dist
 
       - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.PROD_PYPI_PASSWORD }}
