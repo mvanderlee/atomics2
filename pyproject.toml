@@ -2,7 +2,14 @@
 requires = [
     "GitPython",
     "cmake>=3.14",
-    "setuptools>=43.0.0",
+    "setuptools>=64",
+    "setuptools-scm>=8",
     "wheel>=0.25",
 ]
 build-backend = "setuptools.build_meta"
+
+# version comes from the git tag (e.g. tag v1.1.1 -> version 1.1.1);
+# untagged builds get a dev version derived from the last reachable tag
+[tool.setuptools_scm]
+# used when building without git metadata (e.g. GitHub source zip downloads)
+fallback_version = "0.0.0"
