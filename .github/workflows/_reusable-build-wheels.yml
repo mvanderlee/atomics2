@@ -1,0 +1,141 @@
+name: build-wheels
+
+
+on:
+  workflow_call:
+
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: "win32-x86"
+            os: windows-latest
+            arch: x86
+          - name: "win32-amd64"
+            os: windows-latest
+            arch: AMD64
+          - name: "win32-arm64"
+            os: windows-latest
+            arch: ARM64
+
+          - name: "macos-x86_64"
+            os: macos-latest
+            arch: x86_64
+          - name: "macos-arm64"
+            os: macos-latest
+            arch: arm64
+          - name: "macos-universal2"
+            os: macos-latest
+            arch: universal2
+
+          # linux entries are split per libc: manylinux (glibc) and musllinux
+          # (musl) need different patomic builds, so they must not share a
+          # cached _clib or a wheel
+          - name: "linux-i386-manylinux"
+            os: ubuntu-latest
+            arch: i686
+            platform: i386
+            build: "cp312-manylinux*"
+          - name: "linux-i386-musllinux"
+            os: ubuntu-latest
+            arch: i686
+            platform: i386
+            build: "cp312-musllinux*"
+          - name: "linux-x86_64-manylinux"
+            os: ubuntu-latest
+            arch: x86_64
+            platform: x86_64
+            build: "cp312-manylinux*"
+          - name: "linux-x86_64-musllinux"
+            os: ubuntu-latest
+            arch: x86_64
+            platform: x86_64
+            build: "cp312-musllinux*"
+          - name: "linux-aarch64-manylinux"
+            os: ubuntu-latest
+            arch: aarch64
+            platform: aarch64
+            build: "cp312-manylinux*"
+          - name: "linux-aarch64-musllinux"
+            os: ubuntu-latest
+            arch: aarch64
+            platform: aarch64
+            build: "cp312-musllinux*"
+          - name: "linux-ppc64le-manylinux"
+            os: ubuntu-latest
+            arch: ppc64le
+            platform: ppc64le
+            build: "cp312-manylinux*"
+          - name: "linux-ppc64le-musllinux"
+            os: ubuntu-latest
+            arch: ppc64le
+            platform: ppc64le
+            build: "cp312-musllinux*"
+          - name: "linux-s390x-manylinux"
+            os: ubuntu-latest
+            arch: s390x
+            platform: s390x
+            build: "cp312-manylinux*"
+          - name: "linux-s390x-musllinux"
+            os: ubuntu-latest
+            arch: s390x
+            platform: s390x
+            build: "cp312-musllinux*"
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+
+      - name: Set up QEMU
+        if: ${{ startsWith(matrix.config.os, 'ubuntu') }}
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: ${{ matrix.config.platform }}
+
+      # a cached lib in _clib makes build_patomic skip the clone and C build;
+      # setup.py contains the pinned patomic tag, so the key rolls over on upgrades
+      - name: Cache patomic library
+        id: cache-patomic
+        uses: actions/cache@v6
+        with:
+          path: src/atomics2/_clib
+          key: patomic-${{ matrix.config.name }}-${{ hashFiles('setup.py') }}
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v4.1.0
+        env:
+          CIBW_BUILD_VERBOSITY: 3
+          # wheels are version-range-tagged (py311-py314), one build suffices
+          CIBW_BUILD: ${{ matrix.config.build || 'cp312-*' }}
+          CIBW_ARCHS: ${{ matrix.config.arch }}
+          CIBW_ENVIRONMENT: CIBW_MC_NAME=${{ matrix.config.name }}
+          # CI env var isn't present in Linux since it's emulated
+          CIBW_ENVIRONMENT_LINUX: CI=1 CIBW_MC_NAME=${{ matrix.config.name }}
+          CIBW_TEST_REQUIRES: pytest
+          CIBW_TEST_COMMAND: pytest {project}/tests -q
+          # cffi lacks prebuilt wheels on some arch/python combos; its source build needs libffi headers
+          CIBW_BEFORE_TEST_LINUX: yum -y install libffi-devel || apk add --no-cache libffi-dev
+          # no repair needed: the wheel is py-tagged and loads patomic.dll via ctypes;
+          # delvewheel only inspects the dummy extension and fails cross-building arm64
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: ""
+
+      # linux builds run in a container cibuildwheel copies the project into,
+      # so the lib built inside never reaches the host workspace; recover it
+      # from the built wheel so the cache post-step has something to save
+      - name: Extract patomic library from wheel for caching
+        if: runner.os == 'Linux' && steps.cache-patomic.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          whl=$(ls wheelhouse/*.whl | head -n 1)
+          unzip -o "$whl" "atomics2/_clib/*" -d /tmp/wheel-libs
+          cp /tmp/wheel-libs/atomics2/_clib/* src/atomics2/_clib/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: artifact-${{ matrix.config.name }}
+          path: ./wheelhouse/*.whl

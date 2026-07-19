@@ -20,6 +20,11 @@ WIDTHS = [1, 2, 4, 8]
 ])
 def test_arithmetic_ops(width, atype) -> None:
     a = atomics2.atomic(width=width, atype=atype)
+    required = {OpType.LOAD, OpType.STORE, OpType.ADD, OpType.SUB, OpType.INC,
+                OpType.DEC, OpType.FETCH_ADD, OpType.FETCH_SUB}
+    if not required <= set(a.ops_supported):
+        pytest.skip(f"width {width} not fully supported on this platform "
+                    f"(e.g. 64-bit ops on 32-bit MSVC)")
     assert a.load() == 0
     a.store(5)
     a.add(10)

@@ -8,6 +8,11 @@ on:
   workflow_dispatch:
 
 jobs:
+  # same job the release runs, so cross-compile and packaging breakage
+  # (win32-arm64, macOS universal2, musllinux) surfaces on PRs
+  build-wheels:
+    uses: ./.github/workflows/_reusable-build-wheels.yml
+
   test-native:
     name: ${{ matrix.os }} / py${{ matrix.python }}
     runs-on: ${{ matrix.os }}
