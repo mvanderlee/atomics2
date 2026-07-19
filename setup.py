@@ -12,6 +12,7 @@ import git
 import logging
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -218,6 +219,12 @@ class BuildPatomicCommand(Command):
         if msvc_platform:
             self.logger.info(f"Cross-building on CIBW - using '-A {msvc_platform}'")
             cmd_config.append(f"-A{msvc_platform}")
+        # cibuildwheel communicates macOS target archs via ARCHFLAGS,
+        # e.g. "-arch arm64 -arch x86_64" for universal2
+        mac_archs = re.findall(r"-arch\s+(\S+)", os.environ.get("ARCHFLAGS", ""))
+        if sys.platform == "darwin" and mac_archs:
+            self.logger.info(f"macOS target architectures: {mac_archs}")
+            cmd_config.append("-DCMAKE_OSX_ARCHITECTURES=" + ";".join(mac_archs))
         if self.cmake_args:
             self.logger.info(f"Appending CMake args: {self.cmake_args}")
             cmd_config.append(self.cmake_args)
