@@ -26,7 +26,7 @@ jobs:
       - name: Cache patomic library
         uses: actions/cache@v6
         with:
-          path: src/atomic2/_clib
+          path: src/atomics2/_clib
           key: patomic-${{ matrix.os }}-${{ hashFiles('setup.py') }}
 
       - name: Install package (clones and builds patomic)
@@ -64,7 +64,7 @@ jobs:
       - name: Cache patomic library
         uses: actions/cache@v6
         with:
-          path: src/atomic2/_clib
+          path: src/atomics2/_clib
           key: patomic-${{ matrix.arch }}-${{ hashFiles('setup.py') }}
 
       # builds and tests each CPython inside the arch's manylinux container
