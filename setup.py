@@ -192,6 +192,17 @@ class BuildPatomicCommand(Command):
             if not (clone_into / "src").is_dir():
                 self.logger.warning(f"No src directory found in checked out tag: {self.git_tag}")
 
+    def patch_patomic(self, repo_dir: pathlib.Path) -> None:
+        """Patches patomic v1.1.0 MSVC ARM64 store variants that use __int128
+        (unsupported by MSVC) instead of patomic_msvc128_t"""
+        store_h = repo_dir / "src" / "impl" / "msvc" / "ops" / "ldst" / "store.h"
+        if store_h.is_file():
+            text = store_h.read_text()
+            patched = text.replace("__int128, __int128,", "patomic_msvc128_t, patomic_msvc128_t,")
+            if patched != text:
+                store_h.write_text(patched)
+                self.logger.info("Patched MSVC ARM64 __int128 store variants in store.h")
+
     def config_patomic(self, repo_dir: pathlib.Path) -> None:
         """Configures CMake for in repo_dir"""
         assert repo_dir.is_dir()
@@ -269,6 +280,7 @@ class BuildPatomicCommand(Command):
                 repo_path = pathlib.Path(temp_dir)
                 self.logger.info("Cloning repo")
                 self.clone_patomic(repo_path)
+                self.patch_patomic(repo_path)
                 self.logger.info("Configuring CMake")
                 self.config_patomic(repo_path)
                 self.logger.info("Building shared library")
