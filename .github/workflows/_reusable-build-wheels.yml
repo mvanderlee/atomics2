@@ -89,6 +89,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # full history and tags so setuptools-scm can derive the version
+          fetch-depth: 0
       - uses: actions/setup-python@v6
 
       - name: Set up QEMU
