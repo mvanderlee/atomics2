@@ -139,3 +139,33 @@ jobs:
         with:
           name: artifact-${{ matrix.config.name }}
           path: ./wheelhouse/*.whl
+
+  test_wheels:
+    name: Test wheel on ${{ matrix.os }} / py${{ matrix.python }}
+    needs: build_wheels
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # native-arch runners only; emulated arches are tested inside cibuildwheel
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: artifact-*
+          path: wheelhouse
+          merge-multiple: true
+
+      # deps come from PyPI; atomics2 itself must come from the built wheels
+      - name: Install wheel and run tests
+        shell: bash
+        run: |
+          python -m pip install pytest cffi
+          python -m pip install --no-index --no-deps --find-links wheelhouse atomics2
+          python -m pytest tests -q

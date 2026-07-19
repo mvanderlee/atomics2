@@ -11,35 +11,6 @@ jobs:
   build_wheels:
     uses: ./.github/workflows/_reusable-build-wheels.yml
 
-  test_wheels:
-    name: Test wheel on ${{ matrix.os }} / py${{ matrix.python }}
-    needs: build_wheels
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        # native-arch runners only; emulated arches are tested inside cibuildwheel
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ['3.11', '3.12', '3.13', '3.14']
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python }}
-
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: artifact-*
-          path: wheelhouse
-          merge-multiple: true
-
-      - name: Install wheel and run tests
-        shell: bash
-        run: |
-          python -m pip install pytest
-          python -m pip install --no-index --find-links wheelhouse atomics2
-          python -m pytest tests -q
-
   build_sdist:
     name: Build source distribution
     runs-on: ubuntu-latest
@@ -65,7 +36,7 @@ jobs:
           path: dist/*.tar.gz
 
   upload_pypi:
-    needs: [build_wheels, test_wheels, build_sdist]
+    needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
