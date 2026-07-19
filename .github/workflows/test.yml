@@ -21,6 +21,14 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
+      # a cached lib in _clib makes build_patomic skip the clone and C build;
+      # setup.py contains the pinned patomic tag, so the key rolls over on upgrades
+      - name: Cache patomic library
+        uses: actions/cache@v6
+        with:
+          path: src/atomic2/_clib
+          key: patomic-${{ matrix.os }}-${{ hashFiles('setup.py') }}
+
       - name: Install package (clones and builds patomic)
         run: python -m pip install . pytest
 
@@ -50,6 +58,14 @@ jobs:
         uses: docker/setup-qemu-action@v4
         with:
           platforms: ${{ matrix.platform }}
+
+      # a cached lib in _clib makes build_patomic skip the QEMU-emulated C build
+      # (the most expensive step); the first cp311 build populates it otherwise
+      - name: Cache patomic library
+        uses: actions/cache@v6
+        with:
+          path: src/atomic2/_clib
+          key: patomic-${{ matrix.arch }}-${{ hashFiles('setup.py') }}
 
       # builds and tests each CPython inside the arch's manylinux container
       - name: Build wheels and run tests
