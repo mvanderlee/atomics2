@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] [Minor] - 2026-07-18
+### Changed
+- Forked from [doodspav/atomics](https://github.com/doodspav/atomics) at
+  `v1.0.3`; distribution and import renamed from `atomics` to `atomic2`
+- Migrate to `patomic` `v1.1.0` (first stable API/ABI release)
+- Arithmetic operations now use a single two's complement implementation
+  (`patomic` no longer provides separate signed/unsigned ops); public API and
+  overflow behaviour (wraparound) are unchanged
+- Loading a stale `patomic` shared library with a different major version now
+  raises `RuntimeError` instead of silently misreading the ABI
+- Supported Python versions are now 3.11 - 3.14 (wheels were previously tagged
+  up to 3.11 only, forcing source builds on newer interpreters)
+### Fixed
+- Failed `cmpxchg_weak`/`cmpxchg_strong` no longer writes the actual value into
+  the caller's immutable `expected` bytes object (which for width-1 atomics
+  corrupted CPython's interned single-byte objects process-wide)
+- `bit_test` now validates its memory order as a load operation; it previously
+  rejected valid `ACQUIRE` and passed invalid `RELEASE` through to `patomic`
+
 ## [1.0.3] [Patch] - 2025-01-03
 ### Fixed:
 - Properly pin `patomic` version to `v0.2.2` even if `patomic` has a stable

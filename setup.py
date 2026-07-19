@@ -1,6 +1,11 @@
 from setuptools import setup, find_packages, Command, Extension
 from setuptools.command import build_py
-from wheel.bdist_wheel import bdist_wheel
+
+try:
+    # setuptools >= 70.1 (wheel >= 0.46 no longer provides wheel.bdist_wheel)
+    from setuptools.command.bdist_wheel import bdist_wheel
+except ImportError:
+    from wheel.bdist_wheel import bdist_wheel
 
 import configparser
 import git
@@ -78,10 +83,8 @@ class BuildPatomicCommand(Command):
 
     def initialize_options(self) -> None:
         self.git_url = "https://github.com/doodspav/patomic"
-        # pin to patomic v0.2.2 until we migrate to stable release
-        # self.git_tag = None
-        self.git_tag = "v0.2.2"
-        self.dest_dir = here / "src" / "atomics" / "_clib"
+        self.git_tag = "v1.1.0"
+        self.dest_dir = here / "src" / "atomic2" / "_clib"
         self.build_type = "RelWithDebInfo"
         self.force_replace = False
         self.cc_path = None
@@ -159,10 +162,10 @@ class BuildPatomicCommand(Command):
         self.logger.debug(str(opts))
 
     @staticmethod
-    def _cibw_check_win32_x86() -> bool:
-        """Checks if CIBW is building for win32-x86"""
-        env = os.environ.get("CIBW_MC_NAME")
-        return type(env) is str and env.lower() == "win32-x86"
+    def _cibw_msvc_platform() -> Optional[str]:
+        """Returns the CMake -A platform when CIBW cross-builds with MSVC"""
+        env = os.environ.get("CIBW_MC_NAME", "")
+        return {"win32-x86": "Win32", "win32-arm64": "ARM64"}.get(env.lower())
 
     def get_patomic_libs(self, dir_path: pathlib.Path) -> [pathlib.Path]:
         """Returns a list of patomic shared library files found in dir_path"""
@@ -211,9 +214,10 @@ class BuildPatomicCommand(Command):
         if self.linker_args:
             self.logger.info(f"Linker args: {self.linker_args}")
             cmd_config.append(f"-DCMAKE_SHARED_LINKER_FLAGS={self.linker_args}")
-        if self._cibw_check_win32_x86():
-            self.logger.info("Running under win32-x86 on CIBW - using '-A Win32'")
-            cmd_config.append("-AWin32")
+        msvc_platform = self._cibw_msvc_platform()
+        if msvc_platform:
+            self.logger.info(f"Cross-building on CIBW - using '-A {msvc_platform}'")
+            cmd_config.append(f"-A{msvc_platform}")
         if self.cmake_args:
             self.logger.info(f"Appending CMake args: {self.cmake_args}")
             cmd_config.append(self.cmake_args)
@@ -299,7 +303,7 @@ try:
     setup(
         packages=find_packages(where="src"),
         package_dir={"": "src"},
-        package_data={"atomics": ["_clib/*"]},
+        package_data={"atomic2": ["_clib/*"]},
         cmdclass={
             "bdist_wheel": BdistWheelCommand,
             "build_patomic": BuildPatomicCommand,

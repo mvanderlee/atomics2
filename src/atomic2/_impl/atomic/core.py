@@ -64,9 +64,7 @@ class AtomicCore:
             # get op category (e.g. _ops for load, _ops.xchg_ops for exchange, etc...)
             cat = self._ops
             if ot.cname is not None:
-                s_type = "signed" if self._is_signed else "unsigned"
-                cname = ot.cname.replace("arithmetic", s_type)
-                cat = getattr(cat, cname)
+                cat = getattr(cat, ot.cname)
             # get op function pointer
             fp = getattr(cat, ot.fname)
             # add to ots if supported (i.e. fp is not NULL)

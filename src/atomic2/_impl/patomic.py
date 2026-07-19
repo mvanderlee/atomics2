@@ -15,6 +15,8 @@ _opsig_explicit_void_t = CFUNCTYPE(None, c_void_p, c_void_p, c_int)
 _opsig_explicit_void_noarg_t = CFUNCTYPE(None, c_void_p, c_int)
 
 
+# arithmetic ops use two's complement representation (patomic >= 1.0.0),
+# so a single set of ops covers both signed and unsigned use
 class _OpsExplicitArithmetic(Structure):
     _fields_ = [("fp_add", _opsig_explicit_void_t),
                 ("fp_sub", _opsig_explicit_void_t),
@@ -52,20 +54,29 @@ class _OpsExplicitXchg(Structure):
                 ("fp_cmpxchg_strong", _opsig_explicit_cmpxchg_t)]
 
 
+# mirrors patomic_ops_explicit_t (patomic v1.1.0, include/patomic/api/ops/explicit.h)
 class Ops(Structure):
     _fields_ = [("fp_store", _opsig_explicit_store_t),
                 ("fp_load", _opsig_explicit_load_t),
                 ("xchg_ops", _OpsExplicitXchg),
                 ("bitwise_ops", _OpsExplicitBitwise),
                 ("binary_ops", _OpsExplicitBinary),
-                ("signed_ops", _OpsExplicitArithmetic),
-                ("unsigned_ops", _OpsExplicitArithmetic)]
+                ("arithmetic_ops", _OpsExplicitArithmetic)]
 
 
+# mirrors patomic_align_t (include/patomic/api/align.h)
 class Alignment(Structure):
     _fields_ = [("recommended", c_size_t),
                 ("minimum", c_size_t),
                 ("size_within", c_size_t)]
+
+
+# patomic_option_NONE, patomic_kinds_ALL, patomic_ids_ALL
+_OPTION_NONE = 0
+_KINDS_ALL = 0x1F
+_IDS_ALL = c_ulong(-1).value
+
+_SUPPORTED_MAJOR_VERSION = 1
 
 
 class Patomic:
@@ -84,14 +95,24 @@ class Patomic:
             path = path.joinpath("_clib")
             possible_paths = sorted(path.glob("*patomic*"))
             if not possible_paths:
-                raise FileNotFoundError("Could not find patomic lib in atomics._clib")
+                raise FileNotFoundError("Could not find patomic lib in atomic2._clib")
             path = possible_paths[-1]
             # setup lib
             lib = cdll.LoadLibrary(str(path))
+            # struct layouts here match patomic major version 1 only
+            try:
+                lib.patomic_version_major.restype = c_int
+                lib.patomic_version_major.argtypes = []
+                major = lib.patomic_version_major()
+            except AttributeError:
+                major = None
+            if major != _SUPPORTED_MAJOR_VERSION:
+                raise RuntimeError(
+                    f"Incompatible patomic library found at {path} "
+                    f"(major version: {major}, supported: {_SUPPORTED_MAJOR_VERSION})."
+                )
             lib.patomic_create_explicit.restype = Patomic._PatomicExplicit
-            lib.patomic_create_explicit.argtypes = [c_size_t, c_int, c_int]
-            lib.patomic_nonnull_ops_count_explicit.restype = c_int
-            lib.patomic_nonnull_ops_count_explicit.argtypes = [POINTER(Ops)]
+            lib.patomic_create_explicit.argtypes = [c_size_t, c_uint, c_uint, c_ulong]
             # assign to static member
             Patomic._lib = lib
         return Patomic._lib
@@ -103,7 +124,9 @@ class Patomic:
             raise ValueError("Negative width")
         elif width.bit_length() > (sizeof(c_size_t) * char_bit):
             raise OverflowError(width, "Value would overflow size_t")
-        return Patomic._get_lib().patomic_create_explicit(width, 0, 0)
+        return Patomic._get_lib().patomic_create_explicit(
+            width, _OPTION_NONE, _KINDS_ALL, _IDS_ALL
+        )
 
     @staticmethod
     def ops(width: int) -> Ops:
@@ -117,11 +140,12 @@ class Patomic:
 
     @staticmethod
     def count_nonnull_ops(ops: Ops, *, readonly: bool) -> int:
-        res = 0
         if readonly:
             # only current non-modifying ops
-            res += bool(ops.fp_load)
-            res += bool(ops.bitwise_ops.fp_test)
-        else:
-            res = Patomic._get_lib().patomic_nonnull_ops_count_explicit(byref(ops))
+            return bool(ops.fp_load) + bool(ops.bitwise_ops.fp_test)
+        res = bool(ops.fp_store) + bool(ops.fp_load)
+        for cat_name in ("xchg_ops", "bitwise_ops", "binary_ops", "arithmetic_ops"):
+            cat = getattr(ops, cat_name)
+            for fname, _ in cat._fields_:
+                res += bool(getattr(cat, fname))
         return res

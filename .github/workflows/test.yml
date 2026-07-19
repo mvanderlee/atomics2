@@ -1,0 +1,63 @@
+name: test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-native:
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # windows-latest is amd64, macos-15 is arm64, ubuntu-latest is x86_64
+        os: [ubuntu-latest, windows-latest, macos-15]
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install package (clones and builds patomic)
+        run: python -m pip install . pytest
+
+      - name: Run tests
+        run: python -m pytest tests -q
+
+  test-emulated:
+    name: linux-${{ matrix.arch }} (qemu)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: i686
+            platform: i386
+          - arch: aarch64
+            platform: aarch64
+          - arch: ppc64le
+            platform: ppc64le
+          - arch: s390x
+            platform: s390x
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: ${{ matrix.platform }}
+
+      # builds and tests each CPython inside the arch's manylinux container
+      - name: Build wheels and run tests
+        uses: pypa/cibuildwheel@v4.1.0
+        env:
+          CIBW_BUILD: cp311-manylinux* cp312-manylinux* cp313-manylinux* cp314-manylinux*
+          CIBW_ARCHS: ${{ matrix.arch }}
+          CIBW_TEST_REQUIRES: pytest
+          CIBW_TEST_COMMAND: pytest {project}/tests -q
+          # cffi lacks prebuilt wheels on some arch/python combos; its source build needs libffi headers
+          CIBW_BEFORE_TEST: yum -y install libffi-devel || apk add --no-cache libffi-dev

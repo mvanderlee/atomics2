@@ -57,37 +57,72 @@ jobs:
             platform: s390x
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
 
       - name: Set up QEMU
         if: ${{ startsWith(matrix.config.os, 'ubuntu') }}
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: ${{ matrix.config.platform }}
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.22.0
+        uses: pypa/cibuildwheel@v4.1.0
         env:
           CIBW_BUILD_VERBOSITY: 3
+          # wheels are version-range-tagged (py311-py314), one build suffices
+          CIBW_BUILD: "cp312-*"
           CIBW_ARCHS: ${{ matrix.config.arch }}
           CIBW_ENVIRONMENT: CIBW_MC_NAME=${{ matrix.config.name }}
           # CI env var isn't present in Linux since it's emulated
           CIBW_ENVIRONMENT_LINUX: CI=1 CIBW_MC_NAME=${{ matrix.config.name }}
+          CIBW_TEST_REQUIRES: pytest
+          CIBW_TEST_COMMAND: pytest {project}/tests -q
+          # cffi lacks prebuilt wheels on some arch/python combos; its source build needs libffi headers
+          CIBW_BEFORE_TEST_LINUX: yum -y install libffi-devel || apk add --no-cache libffi-dev
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: artifact-${{ matrix.config.name }}
           path: ./wheelhouse/*.whl
+
+  test_wheels:
+    name: Test wheel on ${{ matrix.os }} / py${{ matrix.python }}
+    needs: build_wheels
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # native-arch runners only; emulated arches are tested inside cibuildwheel
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: artifact-*
+          path: wheelhouse
+          merge-multiple: true
+
+      - name: Install wheel and run tests
+        shell: bash
+        run: |
+          python -m pip install pytest
+          python -m pip install --no-index --find-links wheelhouse atomic2
+          python -m pytest tests -q
 
   build_sdist:
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
-          python-version: '3.8'
+          python-version: '3.12'
 
       - name: Install pyproject.toml requirements
         shell: bash
@@ -99,22 +134,22 @@ jobs:
       - name: Build sdist
         run: python setup.py sdist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: artifact-source
           path: dist/*.tar.gz
 
   upload_pypi:
-    needs: [build_wheels, build_sdist]
+    needs: [build_wheels, test_wheels, build_sdist]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/upload-artifact/merge@v4
+      - uses: actions/upload-artifact/merge@v7
         with:
           name: artifact
           pattern: artifact-*
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: artifact
           path: dist

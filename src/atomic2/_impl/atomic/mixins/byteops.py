@@ -28,13 +28,11 @@ class _ImplByteOperationsMixin:
         elif not fail.is_valid_fail_order(succ):
             raise MemoryOrderError(optype, fail, is_fail=True)
         # perform operation
-        exp_mut = bytes(expected)  # make a copy so we can modify it
-        des_mut = bytes(desired)  # make a copy so we can modify it
-        with PyBuffer(exp_mut, writeable=True, force=True) as exp_buf:
-            with PyBuffer(des_mut, writeable=True, force=True) as des_buf:
-                # modifying exp and des contents directly is fine in this case
+        exp_mut = bytearray(expected)  # patomic writes the actual value here on failure
+        with PyBuffer(exp_mut, writeable=True) as exp_buf:
+            with PyBuffer(desired, writeable=False) as des_buf:
                 ok = fp(self._core.address, exp_buf.address, des_buf.address, succ.value, fail.value)
-        return CmpxchgResult(bool(ok), exp_mut)
+        return CmpxchgResult(bool(ok), bytes(exp_mut))
 
     def _impl_bit_test(self, optype: OpType, index: int, order: MemoryOrder) -> bool:
         assert ("BIT_TEST" in optype.name)
@@ -71,9 +69,8 @@ class _ImplByteOperationsMixin:
         # result "param"
         result = None
         if "FETCH" in optype.name:
-            result = bytes(self._core.width)
-            res_buf = PyBuffer(result, writeable=True, force=True)
-            # modifying result contents directly is fine in this case
+            result = bytearray(self._core.width)
+            res_buf = PyBuffer(result, writeable=True)
             args.append(res_buf.address)
             bufs.append(res_buf)
         # perform operation
@@ -81,7 +78,7 @@ class _ImplByteOperationsMixin:
         # release buffers and return
         for buf in bufs:
             buf.release()
-        return result
+        return bytes(result) if result is not None else None
 
 
 class ByteOperationsMixin(_ImplByteOperationsMixin):
@@ -111,11 +108,10 @@ class ByteOperationsMixin(_ImplByteOperationsMixin):
         elif not order.is_valid_load_order():
             raise MemoryOrderError(OpType.LOAD, order, is_fail=False)
         # perform operation
-        result = bytes(self._core.width)
-        with PyBuffer(result, writeable=True, force=True) as res_buf:
-            # modifying result contents directly is fine in this case
+        result = bytearray(self._core.width)
+        with PyBuffer(result, writeable=True) as res_buf:
             fp(self._core.address, order.value, res_buf.address)
-        return result
+        return bytes(result)
 
     def exchange(self, desired: bytes, order: MemoryOrder = MemoryOrder.SEQ_CST) -> bytes:
         # check support
@@ -126,12 +122,11 @@ class ByteOperationsMixin(_ImplByteOperationsMixin):
         elif len(desired) != self._core.width:
             raise ValueError("'desired' object length does not match width.")
         # perform operation
-        result = bytes(self._core.width)
-        with PyBuffer(result, writeable=True, force=True) as res_buf:
-            # modifying result contents directly is fine in this case
+        result = bytearray(self._core.width)
+        with PyBuffer(result, writeable=True) as res_buf:
             with PyBuffer(desired, writeable=False) as des_buf:
                 fp(self._core.address, des_buf.address, order.value, res_buf.address)
-        return result
+        return bytes(result)
 
     def cmpxchg_weak(self, expected: bytes, desired: bytes,
                      succ: MemoryOrder = MemoryOrder.SEQ_CST,
@@ -144,7 +139,7 @@ class ByteOperationsMixin(_ImplByteOperationsMixin):
         return self._impl_cmpxchg(OpType.CMPXCHG_STRONG, expected, desired, succ, fail)
 
     def bit_test(self, index: int, order: MemoryOrder = MemoryOrder.SEQ_CST) -> bool:
-        if not order.is_valid_store_order():
+        if not order.is_valid_load_order():
             raise MemoryOrderError(OpType.BIT_TEST, order, is_fail=False)
         return self._impl_bit_test(OpType.BIT_TEST, index, order)
 
