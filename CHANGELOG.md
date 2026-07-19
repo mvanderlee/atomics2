@@ -6,6 +6,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [1.1.0] [Minor] - 2026-07-18
 ### Changed
+- Forked from [doodspav/atomics](https://github.com/doodspav/atomics) at
+  `v1.0.3`; distribution and import renamed from `atomics` to `atomic2`
 - Migrate to `patomic` `v1.1.0` (first stable API/ABI release)
 - Arithmetic operations now use a single two's complement implementation
   (`patomic` no longer provides separate signed/unsigned ops); public API and

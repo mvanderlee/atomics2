@@ -1,12 +1,12 @@
-"""End-to-end tests for the public atomics API against the bundled patomic lib."""
+"""End-to-end tests for the public atomic2 API against the bundled patomic lib."""
 import sys
 from threading import Thread
 
 import pytest
 
-import atomics
-from atomics import Alignment, CmpxchgResult, MemoryOrder, OpType
-from atomics.exc import MemoryOrderError
+import atomic2
+from atomic2 import Alignment, CmpxchgResult, MemoryOrder, OpType
+from atomic2.exc import MemoryOrderError
 
 WIDTHS = [1, 2, 4, 8]
 
@@ -15,11 +15,11 @@ WIDTHS = [1, 2, 4, 8]
 
 @pytest.mark.parametrize("width", WIDTHS, ids=[f"width{w}" for w in WIDTHS])
 @pytest.mark.parametrize("atype", [
-    pytest.param(atomics.INT, id="int"),
-    pytest.param(atomics.UINT, id="uint"),
+    pytest.param(atomic2.INT, id="int"),
+    pytest.param(atomic2.UINT, id="uint"),
 ])
 def test_arithmetic_ops(width, atype) -> None:
-    a = atomics.atomic(width=width, atype=atype)
+    a = atomic2.atomic(width=width, atype=atype)
     assert a.load() == 0
     a.store(5)
     a.add(10)
@@ -33,7 +33,7 @@ def test_arithmetic_ops(width, atype) -> None:
 
 
 def test_signed_roundtrip() -> None:
-    a = atomics.atomic(width=4, atype=atomics.INT)
+    a = atomic2.atomic(width=4, atype=atomic2.INT)
     a.store(-7)
     assert a.load() == -7
     a.neg()
@@ -42,14 +42,14 @@ def test_signed_roundtrip() -> None:
 
 
 def test_uint_wraparound() -> None:
-    u = atomics.atomic(width=4, atype=atomics.UINT)
+    u = atomic2.atomic(width=4, atype=atomic2.UINT)
     u.dec()
     assert u.load() == 0xFFFFFFFF
     assert not u.signed
 
 
 def test_exchange() -> None:
-    a = atomics.atomic(width=4, atype=atomics.INT)
+    a = atomic2.atomic(width=4, atype=atomic2.INT)
     a.store(3)
     assert a.exchange(9) == 3
     assert a.load() == 9
@@ -60,7 +60,7 @@ def test_exchange() -> None:
 # region - Compare-exchange
 
 def test_cmpxchg_loop() -> None:
-    a = atomics.atomic(width=4, atype=atomics.INT)
+    a = atomic2.atomic(width=4, atype=atomic2.INT)
     a.store(6)
     res = CmpxchgResult(success=False, expected=a.load())
     while not res:
@@ -69,7 +69,7 @@ def test_cmpxchg_loop() -> None:
 
 
 def test_cmpxchg_failure_reports_actual_value() -> None:
-    a = atomics.atomic(width=4, atype=atomics.INT)
+    a = atomic2.atomic(width=4, atype=atomic2.INT)
     a.store(42)
     res = a.cmpxchg_strong(expected=1, desired=2)
     assert not res.success
@@ -80,7 +80,7 @@ def test_cmpxchg_failure_reports_actual_value() -> None:
 def test_failed_cmpxchg_does_not_mutate_caller_bytes() -> None:
     """Regression: patomic used to write the actual value through the caller's
     immutable ``expected`` bytes (corrupting interned width-1 singletons)."""
-    b = atomics.atomic(width=1, atype=atomics.BYTES)
+    b = atomic2.atomic(width=1, atype=atomic2.BYTES)
     b.store(b"\x07")
     expected = b"\x00"
     res = b.cmpxchg_strong(expected=expected, desired=b"\x01")
@@ -90,7 +90,7 @@ def test_failed_cmpxchg_does_not_mutate_caller_bytes() -> None:
     assert expected[0] == 0
     assert (0).to_bytes(1, "little")[0] == 0
     assert bytes([0])[0] == 0
-    i = atomics.atomic(width=1, atype=atomics.UINT)
+    i = atomic2.atomic(width=1, atype=atomic2.UINT)
     i.store(9)
     res = i.cmpxchg_strong(expected=3, desired=4)
     assert not res.success and res.expected == 9
@@ -102,14 +102,14 @@ def test_failed_cmpxchg_does_not_mutate_caller_bytes() -> None:
 # region - Bytes, bitwise, binary operations
 
 def test_bytes_store_load() -> None:
-    b = atomics.atomic(width=2, atype=atomics.BYTES)
+    b = atomic2.atomic(width=2, atype=atomic2.BYTES)
     b.store(b"\x0f\x00")
     assert b.load() == b"\x0f\x00"
     assert bytes(b) == b"\x0f\x00"
 
 
 def test_bitwise_ops() -> None:
-    b = atomics.atomic(width=2, atype=atomics.BYTES)
+    b = atomic2.atomic(width=2, atype=atomic2.BYTES)
     # bit offsets index the native-endian integer representation
     b.store((1).to_bytes(2, sys.byteorder))
     assert b.bit_test(0) is True
@@ -122,7 +122,7 @@ def test_bitwise_ops() -> None:
 
 
 def test_binary_ops() -> None:
-    b = atomics.atomic(width=2, atype=atomics.BYTES)
+    b = atomic2.atomic(width=2, atype=atomic2.BYTES)
     b.store(b"\x0f\x00")
     b.bin_or(b"\xf0\x00")
     assert b.load()[0] == 0xFF
@@ -138,7 +138,7 @@ def test_binary_ops() -> None:
 
 def test_view_shared_buffer() -> None:
     buf = bytearray(4)
-    with atomics.atomicview(buffer=buf, atype=atomics.INT) as v:
+    with atomic2.atomicview(buffer=buf, atype=atomic2.INT) as v:
         v.store(1234)
         assert v.load() == 1234
     assert int.from_bytes(bytes(buf), sys.byteorder, signed=True) == 1234
@@ -146,7 +146,7 @@ def test_view_shared_buffer() -> None:
 
 def test_readonly_view_supports_load_only() -> None:
     ro = memoryview(bytes(4))
-    with atomics.atomicview(buffer=ro, atype=atomics.INT) as v:
+    with atomic2.atomicview(buffer=ro, atype=atomic2.INT) as v:
         assert v.load() == 0
         assert v.readonly
         assert OpType.LOAD in v.ops_supported
@@ -155,7 +155,7 @@ def test_readonly_view_supports_load_only() -> None:
 
 def test_view_context_contract() -> None:
     buf = bytearray(4)
-    ctx = atomics.atomicview(buffer=buf, atype=atomics.INT)
+    ctx = atomic2.atomicview(buffer=buf, atype=atomic2.INT)
     with ctx as v:
         with pytest.raises(ValueError):
             ctx.__enter__()
@@ -179,12 +179,12 @@ def test_alignment() -> None:
 
 
 def test_unsupported_width_raises() -> None:
-    with pytest.raises(atomics.exc.UnsupportedWidthException):
+    with pytest.raises(atomic2.exc.UnsupportedWidthException):
         Alignment(3000)
 
 
 def test_properties() -> None:
-    a = atomics.atomic(width=4, atype=atomics.INT)
+    a = atomic2.atomic(width=4, atype=atomic2.INT)
     assert a.width == 4
     assert not a.readonly
     assert len(a.ops_supported) > 10
@@ -196,13 +196,13 @@ def test_properties() -> None:
     pytest.param(MemoryOrder.RELEASE, "bit_test", (0,), id="release-bit_test"),
 ])
 def test_invalid_memory_order_raises(order, op, args) -> None:
-    a = atomics.atomic(width=4, atype=atomics.INT)
+    a = atomic2.atomic(width=4, atype=atomic2.INT)
     with pytest.raises(MemoryOrderError):
         getattr(a, op)(*args, order=order)
 
 
 def test_valid_memory_orders() -> None:
-    a = atomics.atomic(width=4, atype=atomics.INT)
+    a = atomic2.atomic(width=4, atype=atomic2.INT)
     a.store(1, order=MemoryOrder.RELEASE)
     assert a.load(order=MemoryOrder.ACQUIRE) == 1
     assert a.bit_test(0, order=MemoryOrder.ACQUIRE) is True
@@ -213,7 +213,7 @@ def test_valid_memory_orders() -> None:
 # region - Concurrency
 
 def test_threaded_increment() -> None:
-    a = atomics.atomic(width=4, atype=atomics.INT)
+    a = atomic2.atomic(width=4, atype=atomic2.INT)
     n = 50_000
     threads = [Thread(target=lambda: [a.inc() for _ in range(n)]) for _ in range(4)]
     for t in threads:
