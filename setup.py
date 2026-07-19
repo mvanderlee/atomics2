@@ -84,7 +84,7 @@ class BuildPatomicCommand(Command):
     def initialize_options(self) -> None:
         self.git_url = "https://github.com/doodspav/patomic"
         self.git_tag = "v1.1.0"
-        self.dest_dir = here / "src" / "atomic2" / "_clib"
+        self.dest_dir = here / "src" / "atomics2" / "_clib"
         self.build_type = "RelWithDebInfo"
         self.force_replace = False
         self.cc_path = None
@@ -303,7 +303,7 @@ try:
     setup(
         packages=find_packages(where="src"),
         package_dir={"": "src"},
-        package_data={"atomic2": ["_clib/*"]},
+        package_data={"atomics2": ["_clib/*"]},
         cmdclass={
             "bdist_wheel": BdistWheelCommand,
             "build_patomic": BuildPatomicCommand,

@@ -21,7 +21,7 @@ library (implemented in C).
 ```
 [project]
 │
-└───[src/atomic2]
+└───[src/atomics2]
     │
     └───[_clib]
     └───[_impl]
@@ -30,27 +30,27 @@ library (implemented in C).
             │
             └───[mixins]
 ```
-#### [atomic2._impl.atomic]
+#### [atomics2._impl.atomic]
 This directory holds the implementation of all atomic classes and directly
 related atomic helper functions.
 
-#### [atomic2._impl.atomic.mixins]
+#### [atomics2._impl.atomic.mixins]
 This directory holds the classes implementing all atomic operations and 
 properties, which are then inherited by the atomic classes. No classes here 
 are intended to be constructed as is. Doing so won't break anything, it's just
 useless.
 
-#### [atomic2._impl]
+#### [atomics2._impl]
 This directory holds the building block classes which are used in atomic 
 classes but can also be used as unrelated standalone classes. This includes
 enum and exception classes.
 
-#### [atomic2._clib]
+#### [atomics2._clib]
 This directory exists solely to contain the `patomic` shared library file. This
 file is generated and placed here using the `build_patomic` command from 
 `setup.py`, however it can also be built and placed here manually.
 
-#### [atomic2]
+#### [atomics2]
 Nothing is implemented at this level. All files here exist to nicely partition
 the implemented types for the end user.
 
@@ -83,7 +83,7 @@ on.
 
 ## Inheritance
 
-#### [atomic2._impl.atomic.mixins]
+#### [atomics2._impl.atomic.mixins]
 Mixins provides the following 5 classes, implementing all relevant atomic 
 properties and operations, with the following inheritance hierarchy:
 
@@ -98,7 +98,7 @@ ANY
     └───UINT
 ```
 
-#### [atomic2._impl.atomic]
+#### [atomics2._impl.atomic]
 
 The files here provide the following 5 `AtomicViewContext` classes, which follow
 the same inheritance hierarchy as the mixin classes:

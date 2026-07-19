@@ -129,6 +129,6 @@ dmypy.json
 .pyre/
 
 # Shared libraries
-src/atomic2/_clib/*.dll*
-src/atomic2/_clib/*.dylib*
-src/atomic2/_clib/*.so*
+src/atomics2/_clib/*.dll*
+src/atomics2/_clib/*.dylib*
+src/atomics2/_clib/*.so*
