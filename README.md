@@ -1,4 +1,11 @@
-# atomics
+# atomic2
+
+**This is a maintained fork of [doodspav/atomics](https://github.com/doodspav/atomics)**
+(unmaintained since its `1.0.3` release), published on PyPI as
+[`atomic2`](https://pypi.org/project/atomic2/). It updates the wrapped C library
+to `patomic v1.1.0`, fixes several bugs, adds a test suite, and supports
+Python 3.11 - 3.14. The Python API is unchanged apart from the import name.
+
 This library implements a wrapper around the lower level 
 [patomic](https://github.com/doodspav/patomic) C library (which is provided as
 part of this library through the `build_patomic` command in `setup.py`).
@@ -32,17 +39,18 @@ communication (including with other languages such as C/C++).
 * [Building](#building)
 * [Future Thoughts](#future-thoughts)
 * [Contributing](#contributing)
+* [License and Attribution](#license-and-attribution)
 <!--te-->
 
 ## Installing
 
 Linux/MacOS:
 ```shell
-$ python3 -m pip install atomics
+$ python3 -m pip install atomic2
 ```
 Windows:
 ```shell
-$ py -m pip install atomics
+$ py -m pip install atomic2
 ```
 This library requires Python3.11+, and has a dependency on the `cffi` library.
 While the code here has no dependency on any implementation specific features,
@@ -106,18 +114,18 @@ This example implements the previous example but `a` is now an `AtomicInt` which
 can be safely modified from multiple threads (as opposed to `int` which can't).
 The program is correct, and `a` will equal `total` at the end.
 ```python
-import atomics
+import atomic2
 from threading import Thread
 
 
-def fn(ai: atomics.INTEGRAL, n: int) -> None:
+def fn(ai: atomic2.INTEGRAL, n: int) -> None:
     for _ in range(n):
         ai.inc()
 
 
 if __name__ == "__main__":
     # setup
-    a = atomics.atomic(width=4, atype=atomics.INT)
+    a = atomic2.atomic(width=4, atype=atomic2.INT)
     total = 10_000
     # run threads to completion
     t1 = Thread(target=fn, args=(a, total // 2))
@@ -134,14 +142,14 @@ to demonstrate that atomic operations are also safe across processes. This
 program is also correct, and `a` will equal `total` at the end. It is also how
 one might communicate with processes written in other languages such as C/C++.
 ```python
-import atomics
+import atomic2
 from multiprocessing import Process, shared_memory
 
 
 def fn(shmem_name: str, width: int, n: int) -> None:
     shmem = shared_memory.SharedMemory(name=shmem_name)
     buf = shmem.buf[:width]
-    with atomics.atomicview(buffer=buf, atype=atomics.INT) as a:
+    with atomic2.atomicview(buffer=buf, atype=atomic2.INT) as a:
         for _ in range(n):
             a.inc()
     del buf
@@ -160,7 +168,7 @@ if __name__ == "__main__":
     p1.start(), p2.start()
     p1.join(), p2.join()
     # print results and cleanup
-    with atomics.atomicview(buffer=buf, atype=atomics.INT) as a:
+    with atomic2.atomicview(buffer=buf, atype=atomic2.INT) as a:
         print(f"a[{a.load()}] == total[{total}]")
     del buf
     shmem.close()
@@ -173,10 +181,10 @@ of shared memory such as `mmap` could be used instead.
 ## Docs
 
 ### Types
-The following helper (abstract-ish base) types are available in `atomics`:
+The following helper (abstract-ish base) types are available in `atomic2`:
 - [`ANY`, `INTEGRAL`, `BYTES`, `INT`, `UINT`]
 
-This library provides the following `Atomic` classes in `atomics.base`:
+This library provides the following `Atomic` classes in `atomic2.base`:
 - `Atomic --- ANY`
 - `AtomicIntegral --- INTEGRAL`
 - `AtomicBytes --- BYTES`
@@ -187,8 +195,8 @@ These `Atomic` classes are constructable on their own, but it is strongly
 suggested using the `atomic()` function to construct them. Each class 
 corresponds to one of the above helper types (as indicated).
 
-This library also provides `Atomic*View` (in `atomics.view`) and 
-`Atomic*ViewContext` (in `atomics.ctx`) counterparts to the `Atomic*` classes, 
+This library also provides `Atomic*View` (in `atomic2.view`) and 
+`Atomic*ViewContext` (in `atomic2.ctx`) counterparts to the `Atomic*` classes, 
 corresponding to the same helper types. 
 
 The latter of the two sets of classes can be constructed manually, although it
@@ -207,13 +215,13 @@ This library provides the functions `atomic` and `atomicview`, along with the
 types `BYTES`, `INT`, and `UINT` (as well as `ANY` and `INTEGRAL`) to construct 
 atomic objects like so:
 ```python
-import atomics
+import atomic2
 
-a = atomics.atomic(width=4, atype=atomics.INT)
+a = atomic2.atomic(width=4, atype=atomic2.INT)
 print(a)  # AtomicInt(value=0, width=4, readonly=False, signed=True)
 
 buf = bytearray(2)
-with atomics.atomicview(buffer=buf, atype=atomics.BYTES) as a:
+with atomic2.atomicview(buffer=buf, atype=atomic2.BYTES) as a:
     print(a)  # AtomicBytesView(value=b'\x00\x00', width=2, readonly=True)
 ```
 You should only need to construct objects with an `atype` of `BYTES`, `INT`, or
@@ -255,11 +263,11 @@ object in a `with` statement, and **DO NOT** invalidate the buffer inside that
 
 The protections implemented are shown in this example:
 ```python
-import atomics
+import atomic2
 
 
 buf = bytearray(4)
-ctx = atomics.atomicview(buffer=buf, atype=atomics.INT)
+ctx = atomic2.atomicview(buffer=buf, atype=atomic2.INT)
 
 # ctx.release() here will cause ctx.__enter__() to raise:
 # ValueError("Cannot open context after calling 'release'.")
@@ -298,9 +306,9 @@ on where it can be called.
 ### Alignment
 Different platforms may each have their own alignment requirements for atomic
 operations of given widths. This library provides the `Alignment` class in
-`atomics` to ensure that a given buffer meets these requirements.
+`atomic2` to ensure that a given buffer meets these requirements.
 ```python
-from atomics import Alignment
+from atomic2 import Alignment
 
 buf = bytearray(8)
 align = Alignment(len(buf))
@@ -358,11 +366,11 @@ The `cmpxchg_*` functions return `CmpxchgResult`. This has the attributes
 The `cmpxchg_weak` function may fail spuriously, even if `expected` matches
 the actual value. It should be used as shown below:
 ```python
-import atomics
+import atomic2
 
 
-def atomic_mul(a: atomics.INTEGRAL, operand: int):
-    res = atomics.CmpxchgResult(success=False, expected=a.load())
+def atomic_mul(a: atomic2.INTEGRAL, operand: int):
+    res = atomic2.CmpxchgResult(success=False, expected=a.load())
     while not res:
         desired = res.expected * operand
         res = a.cmpxchg_weak(expected=res.expected, desired=desired)
@@ -395,7 +403,7 @@ using assignment when they meant `.store(...)`.
 
 ### Memory Order
 
-The `MemoryOrder` enum class is provided in `atomics`, and the memory orders 
+The `MemoryOrder` enum class is provided in `atomic2`, and the memory orders 
 are directly copied from C++11's `std::memory_order` documentation found 
 [here](https://en.cppreference.com/w/cpp/atomic/memory_order), except for 
 `CONSUME` (which would be pointless to expose in this library).
@@ -418,7 +426,7 @@ Passing an invalid memory order to one of these ops will raise
 `MemoryOrderError`.
 
 ### Exceptions
-The following exceptions are available in `atomics.exc`:
+The following exceptions are available in `atomic2.exc`:
 - `AlignmentError`
 - `MemoryOrderError`
 - `UnsupportedWidthException`
@@ -432,7 +440,7 @@ Using `setup.py`'s `build` or `bdist_wheel` commands will run the
 `build_patomic` command (which you can also run directly).
 
 This clones the `patomic` library into a temporary directory, builds it, and
-then copies the shared library into `atomics._clib`.
+then copies the shared library into `atomic2._clib`.
 
 This requires that `git` be installed on your system (a requirement of the
 `GitPython` module). You will also need a C compiler with C11 `<stdatomic.h>`
@@ -443,7 +451,7 @@ operations. `CMake` is also required but should be automatically
 If you absolutely cannot get `build_patomic` to work, go to
 [patomic](https://github.com/doodspav/patomic), follow the instructions on
 building it (making sure to build the shared library version), and then
-copy-paste the shared library file into `atomics._clib` manually.
+copy-paste the shared library file into `atomic2._clib` manually.
 
 **NOTE:**
 Currently, the library builds a dummy extension in order to trick `setuptools`
@@ -467,3 +475,12 @@ following two points:
 be updated
 - new architectures, widths, and existing unsupported operations must be 
 supported in `patomic` (no change required in this library)
+
+## License and Attribution
+This project is licensed under the GNU General Public License v3
+([LICENSE.txt](LICENSE.txt)), the same license as the original project.
+
+`atomic2` is a fork of [atomics](https://github.com/doodspav/atomics),
+copyright [doodspav](https://github.com/doodspav), which also authored the
+underlying [patomic](https://github.com/doodspav/patomic) C library.
+Changes in this fork are copyright Michiel van der Lee.
