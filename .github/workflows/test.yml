@@ -62,6 +62,7 @@ jobs:
       # a cached lib in _clib makes build_patomic skip the QEMU-emulated C build
       # (the most expensive step); the first cp311 build populates it otherwise
       - name: Cache patomic library
+        id: cache-patomic
         uses: actions/cache@v6
         with:
           path: src/atomics2/_clib
@@ -77,3 +78,13 @@ jobs:
           CIBW_TEST_COMMAND: pytest {project}/tests -q
           # cffi lacks prebuilt wheels on some arch/python combos; its source build needs libffi headers
           CIBW_BEFORE_TEST: yum -y install libffi-devel || apk add --no-cache libffi-dev
+
+      # cibuildwheel copies the project into its build container, so the lib
+      # built inside never reaches the host workspace; recover it from the
+      # built wheel so the cache post-step has something to save
+      - name: Extract patomic library from wheel for caching
+        if: steps.cache-patomic.outputs.cache-hit != 'true'
+        run: |
+          whl=$(ls wheelhouse/*.whl | head -n 1)
+          unzip -o "$whl" "atomics2/_clib/*" -d /tmp/wheel-libs
+          cp /tmp/wheel-libs/atomics2/_clib/* src/atomics2/_clib/
